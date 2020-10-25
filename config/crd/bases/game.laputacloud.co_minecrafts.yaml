@@ -1,0 +1,127 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
+  creationTimestamp: null
+  name: minecrafts.game.laputacloud.co
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.status
+    name: Status
+    type: string
+  - JSONPath: .status.address
+    name: Address
+    type: string
+  group: game.laputacloud.co
+  names:
+    kind: Minecraft
+    listKind: MinecraftList
+    plural: minecrafts
+    singular: minecraft
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: Minecraft is the Schema for the minecrafts API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: MinecraftSpec defines the desired state of Minecraft
+          properties:
+            config:
+              additionalProperties:
+                type: string
+              description: Config to be passed to the server container as environment
+                variables.
+              type: object
+            image:
+              description: Image the server container to pull and run.
+              type: string
+            limitCpu:
+              description: CPU is the CPU resource limit of the created instance.
+              type: string
+            limitMemory:
+              description: Memory is the Memory resource limit of the created instance.
+              type: string
+            probeDelay:
+              description: ProbeDelay gives the Pod time to start before healthchecking
+                begins.
+              format: int32
+              type: integer
+            probePeriod:
+              description: ProbePeriod indicates how often to do liveness probing.
+                Changing this period will effect how aggresively the instance is restarted
+                if it starts to become resource-constrained.
+              format: int32
+              type: integer
+            requestCpu:
+              description: CPU is the CPU resource limit of the created instance.
+              type: string
+            requestMemory:
+              description: Memory is the Memory resource limit of the created instance.
+              type: string
+            serve:
+              description: Serve tells the controller to run or stop this Server.
+              type: boolean
+            servicePort:
+              description: ServicePort the port the server service will be reachable
+                on.
+              format: int32
+              type: integer
+            serviceType:
+              description: ServiceType the type of Kubernetes Service to create.
+              type: string
+            storageClassName:
+              description: StorageClassName the storage class for creating the game
+                data PVC.
+              type: string
+            storageSize:
+              description: StorageSize the capacity of the game data PVC.
+              type: string
+          type: object
+        status:
+          description: MinecraftStatus defines the observed state of Minecraft
+          properties:
+            address:
+              description: Address the public server address
+              type: string
+            status:
+              description: Status indicates the Server Status
+              enum:
+              - Creating
+              - Destroying
+              - Running
+              - Starting
+              - Stopped
+              - Stopping
+              - Unknown
+              - Updating
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

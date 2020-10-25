@@ -1,0 +1,42 @@
+
+EULA: "TRUE"
+ENABLE_AUTOPAUSE: "TRUE"
+OVERRIDE_SERVER_PROPERTIES: "TRUE"
+MAX_TICK_TIME: "-1"
+      
+EULA: "TRUE"
+MAX_MEMORY: 32G
+MAX_BUILD_HEIGHT: 256
+VIEW_DISTANCE: 15
+LEVEL_TYPE: LARGEBIOMES
+MAX_PLAYERS: 100
+CONSOLE: "false"
+      
+volumes:
+- ./modpacks:/modpacks:ro
+environment:
+    EULA: "true"
+    TYPE: CURSEFORGE
+    CF_SERVER_MOD: /modpacks/SkyFactory_4_Server_4.1.0.zip
+
+EULA: "TRUE"
+# Set server type (vs the default of vanilla)
+TYPE: FTBA
+# Use Pack ID from https://ftb.neptunepowered.org/pack/ftb-presents-direwolf20-1-12/
+FTB_MODPACK_ID: "31"
+
+TYPE: PAPER
+VERSION: 1.9.4
+# needed for Paper versions before 1.14
+CONSOLE: "false"
+
+EULA: "TRUE"
+VERSION: 1.7.2
+WORLD: https://www.minecraftmaps.com/survival-maps/cube-survival/download
+
+UID=1000 GID=1000 \
+  JVM_XX_OPTS="-XX:+UseG1GC" MEMORY="1G" \
+  TYPE=VANILLA VERSION=LATEST FORGEVERSION=RECOMMENDED SPONGEBRANCH=STABLE SPONGEVERSION= FABRICVERSION=LATEST LEVEL=world \
+  PVP=true DIFFICULTY=easy ENABLE_RCON=true RCON_PORT=25575 RCON_PASSWORD=minecraft \
+  LEVEL_TYPE=DEFAULT SERVER_PORT=25565 ONLINE_MODE=TRUE SERVER_NAME="Dedicated Server" \
+  ENABLE_AUTOPAUSE=false AUTOPAUSE_TIMEOUT_EST=3600 AUTOPAUSE_TIMEOUT_KN=120 AUTOPAUSE_TIMEOUT_INIT=600 AUTOPAUSE_PERIOD=10

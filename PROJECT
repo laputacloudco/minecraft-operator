@@ -1,0 +1,7 @@
+domain: laputacloud.co
+repo: github.com/laputacloudco/minecraft-operator
+resources:
+- group: game
+  kind: Minecraft
+  version: v1alpha1
+version: "2"
