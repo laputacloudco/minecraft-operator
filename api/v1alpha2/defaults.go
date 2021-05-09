@@ -6,14 +6,14 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	v1 "k8s.io/api/core/v1"
 )
 
 const (
-	defaultImage = "quay.io/laputacloudco/minecraft-vanilla:latest"
+	defaultImage = "docker.io/itzg/minecraft-server"
 )
 
 // SetDefaults sets defaults if server options were not specified.

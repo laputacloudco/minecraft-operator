@@ -1,7 +1,16 @@
 domain: laputacloud.co
+layout:
+- go.kubebuilder.io/v3
+projectName: minecraft-operator
 repo: github.com/laputacloudco/minecraft-operator
 resources:
-- group: game
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: laputacloud.co
+  group: game
   kind: Minecraft
+  path: github.com/laputacloudco/minecraft-operator/api/v1alpha2
   version: v1alpha2
-version: "2"
+version: "3"
