@@ -9,10 +9,10 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package component
 
 import (
-	"github.com/laputacloudco/minecraft-operator/api/v1alpha1"
+	"github.com/laputacloudco/minecraft-operator/api/v1alpha2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NeedsUpdateConfigMap returns if the passed Services are out of sync
@@ -31,7 +31,7 @@ func NeedsUpdateConfigMap(want, have v1.ConfigMap) bool {
 }
 
 // GenerateConfigMap creates a configmap from a Minecraft server config struct
-func GenerateConfigMap(mc v1alpha1.Minecraft) v1.ConfigMap {
+func GenerateConfigMap(mc v1alpha2.Minecraft) v1.ConfigMap {
 	cm := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: make(map[string]string),
@@ -45,13 +45,13 @@ func GenerateConfigMap(mc v1alpha1.Minecraft) v1.ConfigMap {
 }
 
 // IndexConfigMap indexer func for controller-runtime
-func IndexConfigMap(o runtime.Object) []string {
+func IndexConfigMap(o client.Object) []string {
 	cm := o.(*v1.ConfigMap)
 	owner := metav1.GetControllerOf(cm)
 	if owner == nil {
 		return nil
 	}
-	if owner.APIVersion != v1alpha1.GroupVersion.String() || owner.Kind != "Minecraft" {
+	if owner.APIVersion != v1alpha2.GroupVersion.String() || owner.Kind != "Minecraft" {
 		return nil
 	}
 	return []string{owner.Name}
