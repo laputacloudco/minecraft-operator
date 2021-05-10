@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,8 +32,9 @@ const (
 // MinecraftReconciler reconciles a Minecraft object
 type MinecraftReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts,verbs=get;list;watch;create;update;patch;delete
@@ -40,6 +42,7 @@ type MinecraftReconciler struct {
 //+kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumeclaims;services,verbs=create;delete;get;list;update;watch
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
 // Reconcile a Minecraft object
 func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -76,8 +79,10 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &cm); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create ConfigMap %s, err = ", cm.Name, err)
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "ConfigMap %s created", cm.Name)
 		} else {
 			// update configmap if it does not match spec
 			if component.NeedsUpdateConfigMap(cm, configMaps.Items[0]) {
@@ -86,14 +91,19 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 					return ctrl.Result{}, err
 				}
 				if err := r.Update(ctx, &cm); err != nil {
+					r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update ConfigMap %s, err = ", cm.Name, err)
 					return ctrl.Result{}, err
 				}
+				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "ConfigMap %s updated", cm.Name)
 			}
 		}
 	} else {
 		for _, cm := range configMaps.Items {
 			if err := r.Delete(ctx, &cm); err != nil {
 				log.Error(err, "failed to delete cm")
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete ConfigMap %s, err = ", cm.Name, err)
+			} else {
+				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "ConfigMap %s deleted", cm.Name)
 			}
 		}
 	}
@@ -123,13 +133,18 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &pvc); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create PersistentVolumeClaim %s, err = ", pvc.Name, err)
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "PersistentVolumeClaim %s created", pvc.Name)
 		}
 	} else {
 		for _, pvc := range persistentVolumeClaims.Items {
 			if err := r.Delete(ctx, &pvc); err != nil {
 				log.Error(err, "failed to delete pvc")
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete PersistentVolumeClaim %s, err = ", pvc.Name, err)
+			} else {
+				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "PersistentVolumeClaim %s deleted", pvc.Name)
 			}
 		}
 	}
@@ -167,8 +182,10 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &deploy); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Deployment %s, err = ", deploy.Name, err)
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Deployment %s created", deploy.Name)
 		} else {
 			// update deployment if it does not match spec
 			if component.NeedsUpdateDeployment(deploy, deployments.Items[0]) {
@@ -187,16 +204,20 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 					}
 				}
 				if err := r.Update(ctx, &deploy); err != nil {
+					r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update Deployment %s, err = ", deploy.Name, err)
 					return ctrl.Result{}, err
 				}
+				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "Deployment %s updated", deploy.Name)
 			}
 		}
 	} else {
 		for _, deploy := range deployments.Items {
 			if err := r.Delete(ctx, &deploy); err != nil {
 				log.Error(err, "failed to delete deploy")
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Deployment %s, err = ", deploy.Name, err)
 			}
 		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Deployment %s deleted", deploy.Name)
 	}
 
 	// generate service from spec
@@ -217,51 +238,28 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if len(services.Items) == 0 && mc.Spec.Serve {
 			log.Info("creating service", "existing", len(services.Items))
 
-			// // as a special case during inital service creation, check for other
-			// // services in the namespace and make a determinition on what this
-			// // service's port and potential loadbalancer IP should be.
-			// var otherServices corev1.ServiceList
-			// if err := r.List(ctx, &otherServices, client.InNamespace(req.Namespace)); err != nil {
-			// 	log.Error(err, "unable to list Services", "namespace", req.Namespace, "owner", "all")
-			// }
-
-			// log.Info("found other services", "qty", len(otherServices.Items))
-
-			// // if there are extant services, extract a loadbalancer to attach to
-			// loadbalancer, err := component.ExtractExistingLoadbalancerIP(otherServices.Items)
-			// if err != nil {
-			// 	log.Error(err, "other loadbalancers present not ready")
-			// 	return ctrl.Result{}, err
-			// }
-			// log.Info("extant loadbalancer found", "ip", loadbalancer)
-			// service.Spec.LoadBalancerIP = loadbalancer
-
-			// // if there are extant services, find an available port in the range
-			// port := component.AssignServicePort(otherServices.Items, 25565, 25570)
-			// if port < 0 {
-			// 	log.Error(nil, "no available ports in range")
-			// 	return ctrl.Result{}, errors.New("no available ports in range")
-			// }
-			// log.Info("assigned service port", "port", port)
-			// service.Spec.Ports[0].Port = port
-
 			// set status and create
 			if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &service); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Service %s, err = ", service.Name, err)
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Service %s created", service.Name)
 		}
 		// destroy service, if it does exist and Minecraft.Serve is false
 		if len(services.Items) > 0 && !mc.Spec.Serve {
 			log.Info("destroying service")
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleting", "Deleting service %s", service.Name)
 			if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Delete(ctx, &service); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Service %s, err = ", service.Name, err)
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Service %s deleted", service.Name)
 		}
 		if len(services.Items) == 0 && !mc.Spec.Serve {
 			if err := r.setStatus(ctx, mc, v1alpha2.Stopped); err != nil {
@@ -291,9 +289,12 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	} else {
 		for _, svc := range services.Items {
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleting", "Deleting service %s", service.Name)
 			if err := r.Delete(ctx, &svc); err != nil {
 				log.Error(err, "failed to delete svc")
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Service %s, err = ", service.Name, err)
 			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Deleting service %s", service.Name)
 		}
 	}
 
