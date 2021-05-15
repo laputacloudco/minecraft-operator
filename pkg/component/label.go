@@ -9,10 +9,10 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package component
 
 import (
-	gamev1alpha2 "github.com/laputacloudco/minecraft-operator/api/v1alpha2"
+	gamev1alpha1 "github.com/laputacloudco/minecraft-operator/api/v1alpha1"
 )
 
-func standardLabels(mc gamev1alpha2.Minecraft) map[string]string {
+func standardLabels(mc gamev1alpha1.Minecraft) map[string]string {
 	return map[string]string{
 		"app":      "minecraft",
 		"instance": mc.Name,

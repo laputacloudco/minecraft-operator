@@ -11,16 +11,16 @@ package component
 import (
 	"errors"
 
-	"github.com/laputacloudco/minecraft-operator/api/v1alpha2"
-	"github.com/laputacloudco/minecraft-operator/internal/sort"
+	"github.com/laputacloudco/minecraft-operator/api/v1alpha1"
+	"github.com/laputacloudco/minecraft-operator/pkg/sort"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GenerateService creates a Service for the Minecraft server.
-func GenerateService(mc v1alpha2.Minecraft) v1.Service {
+func GenerateService(mc v1alpha1.Minecraft) v1.Service {
 	return v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: make(map[string]string),
@@ -87,13 +87,13 @@ func AssignServicePort(extant []v1.Service, minPort, maxPort int32) int32 {
 }
 
 // IndexService owner indexer func for controller-runtime.
-func IndexService(o client.Object) []string {
+func IndexService(o runtime.Object) []string {
 	svc := o.(*v1.Service)
 	owner := metav1.GetControllerOf(svc)
 	if owner == nil {
 		return nil
 	}
-	if owner.APIVersion != v1alpha2.GroupVersion.String() || owner.Kind != "Minecraft" {
+	if owner.APIVersion != v1alpha1.GroupVersion.String() || owner.Kind != "Minecraft" {
 		return nil
 	}
 	return []string{owner.Name}

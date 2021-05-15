@@ -9,15 +9,15 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package component
 
 import (
-	"github.com/laputacloudco/minecraft-operator/api/v1alpha2"
+	"github.com/laputacloudco/minecraft-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // GeneratePVC creates a PVC for the Minecraft server
-func GeneratePVC(mc v1alpha2.Minecraft) (v1.PersistentVolumeClaim, error) {
+func GeneratePVC(mc v1alpha1.Minecraft) (v1.PersistentVolumeClaim, error) {
 	pvcSizeRequest, err := resource.ParseQuantity(mc.Spec.StorageSize)
 	if err != nil {
 		return v1.PersistentVolumeClaim{}, err
@@ -42,13 +42,13 @@ func GeneratePVC(mc v1alpha2.Minecraft) (v1.PersistentVolumeClaim, error) {
 }
 
 // IndexPVC indexer func for controller-runtime
-func IndexPVC(o client.Object) []string {
+func IndexPVC(o runtime.Object) []string {
 	pvc := o.(*v1.PersistentVolumeClaim)
 	owner := metav1.GetControllerOf(pvc)
 	if owner == nil {
 		return nil
 	}
-	if owner.APIVersion != v1alpha2.GroupVersion.String() || owner.Kind != "Minecraft" {
+	if owner.APIVersion != v1alpha1.GroupVersion.String() || owner.Kind != "Minecraft" {
 		return nil
 	}
 	return []string{owner.Name}

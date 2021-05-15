@@ -45,12 +45,6 @@ rules:
 - apiGroups:
   - game.laputacloud.co
   resources:
-  - minecrafts/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - game.laputacloud.co
-  resources:
   - minecrafts/status
   verbs:
   - get

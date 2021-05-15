@@ -6,7 +6,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 
-package v1alpha2
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +61,7 @@ type MinecraftSpec struct {
 }
 
 // ServerStatus indicates the Server Status
-//+kubebuilder:validation:Enum=Creating;Destroying;Running;Starting;Stopped;Stopping;Unknown;Updating
+// +kubebuilder:validation:Enum=Creating;Destroying;Running;Starting;Stopped;Stopping;Unknown;Updating
 type ServerStatus string
 
 const (
@@ -91,10 +91,10 @@ type MinecraftStatus struct {
 	Address string `json:"address,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.status`
-//+kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.status.address`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.status`
+// +kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.status.address`
 
 // Minecraft is the Schema for the minecrafts API
 type Minecraft struct {
@@ -105,7 +105,7 @@ type Minecraft struct {
 	Status MinecraftStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // MinecraftList contains a list of Minecraft
 type MinecraftList struct {

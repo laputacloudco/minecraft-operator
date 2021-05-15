@@ -9,12 +9,12 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package component
 
 import (
-	"github.com/laputacloudco/minecraft-operator/api/v1alpha2"
+	"github.com/laputacloudco/minecraft-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // NeedsUpdateDeployment returns if the passed Services are out of sync
@@ -30,7 +30,7 @@ func NeedsUpdateDeployment(want, have appsv1.Deployment) bool {
 }
 
 // GenerateDeployment creates a Minecraft server deployment
-func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
+func GenerateDeployment(mc v1alpha1.Minecraft) (appsv1.Deployment, error) {
 	r := int32(0)
 	if mc.Spec.Serve {
 		r = 1
@@ -154,13 +154,13 @@ func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
 }
 
 // IndexDeployment indexer func for controller-runtime
-func IndexDeployment(o client.Object) []string {
+func IndexDeployment(o runtime.Object) []string {
 	deploy := o.(*appsv1.Deployment)
 	owner := metav1.GetControllerOf(deploy)
 	if owner == nil {
 		return nil
 	}
-	if owner.APIVersion != v1alpha2.GroupVersion.String() || owner.Kind != "Minecraft" {
+	if owner.APIVersion != v1alpha1.GroupVersion.String() || owner.Kind != "Minecraft" {
 		return nil
 	}
 	return []string{owner.Name}

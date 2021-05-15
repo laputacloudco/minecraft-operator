@@ -13,8 +13,9 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	v1alpha2 "github.com/laputacloudco/minecraft-operator/api/v1alpha2"
-	"github.com/laputacloudco/minecraft-operator/internal/component"
+	"github.com/laputacloudco/minecraft-operator/api/v1alpha1"
+	gamev1alpha1 "github.com/laputacloudco/minecraft-operator/api/v1alpha1"
+	"github.com/laputacloudco/minecraft-operator/pkg/component"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,25 +36,25 @@ type MinecraftReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;update;watch
-//+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumeclaims;services,verbs=create;delete;get;list;update;watch
+// +kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=game.laputacloud.co,resources=minecrafts/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;update;watch
+// +kubebuilder:rbac:groups="",resources=configmaps;persistentvolumeclaims;services,verbs=create;delete;get;list;update;watch
 
-// Reconcile a Minecraft object
-func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+// Reconcile a Minecraft
+func (r *MinecraftReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
 	log := r.Log.WithValues("minecraft", req.NamespacedName)
 
 	log.Info("reconciling", "name", req.Name)
 
 	// Get this Minecraft
-	mc := &v1alpha2.Minecraft{}
+	mc := &v1alpha1.Minecraft{}
 	if err := r.Get(ctx, req.NamespacedName, mc); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	v1alpha2.SetDefaults(mc)
-	destroying := mc.Status.Status == v1alpha2.Destroying
+	v1alpha1.SetDefaults(mc)
+	destroying := mc.Status.Status == v1alpha1.Destroying
 
 	// generate configmap from spec
 	cm := component.GenerateConfigMap(*mc)
@@ -72,7 +73,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !destroying {
 		if len(configMaps.Items) < 1 {
 			log.Info("creating configmap")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Creating); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &cm); err != nil {
@@ -82,7 +83,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// update configmap if it does not match spec
 			if component.NeedsUpdateConfigMap(cm, configMaps.Items[0]) {
 				log.Info("updating configmap")
-				if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
+				if err := r.setStatus(ctx, mc, gamev1alpha1.Updating); err != nil {
 					return ctrl.Result{}, err
 				}
 				if err := r.Update(ctx, &cm); err != nil {
@@ -119,7 +120,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !destroying {
 		if len(persistentVolumeClaims.Items) < 1 {
 			log.Info("creating pvc")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Creating); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &pvc); err != nil {
@@ -163,7 +164,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		// create Deployment, if it does not exist
 		if len(deployments.Items) < 1 {
 			log.Info("creating deployment")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Creating); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &deploy); err != nil {
@@ -173,16 +174,16 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// update deployment if it does not match spec
 			if component.NeedsUpdateDeployment(deploy, deployments.Items[0]) {
 				log.Info("updating deployment")
-				if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
+				if err := r.setStatus(ctx, mc, gamev1alpha1.Updating); err != nil {
 					return ctrl.Result{}, err
 				}
 				if *deploy.Spec.Replicas == 0 && *deployments.Items[0].Spec.Replicas != 0 {
-					if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
+					if err := r.setStatus(ctx, mc, gamev1alpha1.Stopping); err != nil {
 						return ctrl.Result{}, err
 					}
 				}
 				if *deploy.Spec.Replicas != 0 && *deployments.Items[0].Spec.Replicas == 0 {
-					if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+					if err := r.setStatus(ctx, mc, gamev1alpha1.Starting); err != nil {
 						return ctrl.Result{}, err
 					}
 				}
@@ -246,7 +247,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// service.Spec.Ports[0].Port = port
 
 			// set status and create
-			if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Starting); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, &service); err != nil {
@@ -256,7 +257,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		// destroy service, if it does exist and Minecraft.Serve is false
 		if len(services.Items) > 0 && !mc.Spec.Serve {
 			log.Info("destroying service")
-			if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Stopping); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.Delete(ctx, &service); err != nil {
@@ -264,7 +265,7 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 		}
 		if len(services.Items) == 0 && !mc.Spec.Serve {
-			if err := r.setStatus(ctx, mc, v1alpha2.Stopped); err != nil {
+			if err := r.setStatus(ctx, mc, gamev1alpha1.Stopped); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.setStatusAddress(ctx, mc, nil); err != nil {
@@ -277,11 +278,11 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				if err := r.setStatusAddress(ctx, mc, &services.Items[0]); err != nil {
 					return ctrl.Result{}, err
 				}
-				if err := r.setStatus(ctx, mc, v1alpha2.Running); err != nil {
+				if err := r.setStatus(ctx, mc, gamev1alpha1.Running); err != nil {
 					return ctrl.Result{}, err
 				}
 			} else {
-				if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+				if err := r.setStatus(ctx, mc, gamev1alpha1.Starting); err != nil {
 					return ctrl.Result{}, err
 				}
 				if err := r.setStatusAddress(ctx, mc, nil); err != nil {
@@ -300,22 +301,21 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *MinecraftReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &appsv1.Deployment{}, OwnerKey, component.IndexDeployment); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(&appsv1.Deployment{}, OwnerKey, component.IndexDeployment); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &corev1.ConfigMap{}, OwnerKey, component.IndexConfigMap); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.ConfigMap{}, OwnerKey, component.IndexConfigMap); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &corev1.Service{}, OwnerKey, component.IndexService); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, OwnerKey, component.IndexService); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &corev1.PersistentVolumeClaim{}, OwnerKey, component.IndexPVC); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.PersistentVolumeClaim{}, OwnerKey, component.IndexPVC); err != nil {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha2.Minecraft{}).
+		For(&gamev1alpha1.Minecraft{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Service{}).
@@ -323,12 +323,12 @@ func (r *MinecraftReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *MinecraftReconciler) setStatus(ctx context.Context, mc *v1alpha2.Minecraft, status v1alpha2.ServerStatus) error {
+func (r *MinecraftReconciler) setStatus(ctx context.Context, mc *gamev1alpha1.Minecraft, status gamev1alpha1.ServerStatus) error {
 	mc.Status.Status = status
 	return r.Status().Update(ctx, mc)
 }
 
-func (r *MinecraftReconciler) setStatusAddress(ctx context.Context, mc *v1alpha2.Minecraft, svc *corev1.Service) error {
+func (r *MinecraftReconciler) setStatusAddress(ctx context.Context, mc *gamev1alpha1.Minecraft, svc *corev1.Service) error {
 	mc.Status.Address = ""
 	if svc == nil {
 		return r.Status().Update(ctx, mc)

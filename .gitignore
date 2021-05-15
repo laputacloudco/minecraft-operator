@@ -22,7 +22,3 @@ bin
 *.swp
 *.swo
 *~
-
-testbin
-bin
-minecraft-operator
