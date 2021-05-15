@@ -5,7 +5,7 @@ Note: See [itzg/docker-minecraft-server](https://github.com/itzg/docker-minecraf
 
 Deploy the operator, then deploy this:
 ```yaml
-apiVersion: game.laputacloud.co/v1alpha1
+apiVersion: game.laputacloud.co/v1alpha2
 kind: Minecraft
 metadata:
   name: sample
