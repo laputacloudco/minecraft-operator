@@ -20,6 +20,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -42,6 +50,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - game.laputacloud.co
+  resources:
+  - minecrafts/finalizers
+  verbs:
+  - update
 - apiGroups:
   - game.laputacloud.co
   resources:
