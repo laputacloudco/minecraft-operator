@@ -35,10 +35,10 @@ func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
 	if mc.Spec.Serve {
 		r = 1
 	}
-	limitCPU, _ := resource.ParseQuantity(mc.Spec.LimitCPU)
-	limitMem, _ := resource.ParseQuantity(mc.Spec.LimitMemory)
-	requestCPU, _ := resource.ParseQuantity(mc.Spec.RequestCPU)
-	requestMem, _ := resource.ParseQuantity(mc.Spec.RequestMemory)
+	limitCPU, _ := resource.ParseQuantity(mc.Spec.DeploymentOptions.LimitCPU)
+	limitMem, _ := resource.ParseQuantity(mc.Spec.DeploymentOptions.LimitMemory)
+	requestCPU, _ := resource.ParseQuantity(mc.Spec.DeploymentOptions.RequestCPU)
+	requestMem, _ := resource.ParseQuantity(mc.Spec.DeploymentOptions.RequestMemory)
 	return appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: make(map[string]string),
@@ -64,7 +64,7 @@ func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
 					Containers: []corev1.Container{
 						{
 							Name:            mc.Name,
-							Image:           mc.Spec.Image,
+							Image:           mc.Spec.DeploymentOptions.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
@@ -109,8 +109,8 @@ func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
 									},
 								},
 								FailureThreshold:    3,
-								InitialDelaySeconds: mc.Spec.ProbeDelay,
-								PeriodSeconds:       mc.Spec.ProbePeriod,
+								InitialDelaySeconds: mc.Spec.DeploymentOptions.ProbeDelay,
+								PeriodSeconds:       mc.Spec.DeploymentOptions.ProbePeriod,
 								SuccessThreshold:    1,
 							},
 							LivenessProbe: &corev1.Probe{
@@ -125,8 +125,8 @@ func GenerateDeployment(mc v1alpha2.Minecraft) (appsv1.Deployment, error) {
 									},
 								},
 								FailureThreshold:    3,
-								InitialDelaySeconds: mc.Spec.ProbeDelay,
-								PeriodSeconds:       mc.Spec.ProbePeriod,
+								InitialDelaySeconds: mc.Spec.DeploymentOptions.ProbeDelay,
+								PeriodSeconds:       mc.Spec.DeploymentOptions.ProbePeriod,
 								SuccessThreshold:    1,
 							},
 							VolumeMounts: []corev1.VolumeMount{

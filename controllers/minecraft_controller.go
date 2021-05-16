@@ -56,10 +56,12 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	v1alpha2.SetDefaults(mc)
-	destroying := mc.Status.Status == v1alpha2.Destroying
 
 	// generate configmap from spec
-	cm := component.GenerateConfigMap(*mc)
+	cm, err := component.GenerateConfigMap(*mc)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if err := ctrl.SetControllerReference(mc, &cm, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -72,39 +74,28 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// create ConfigMap, if it does not exist
-	if !destroying {
-		if len(configMaps.Items) < 1 {
-			log.Info("creating configmap")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &cm); err != nil {
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create ConfigMap %s, err = ", cm.Name, err)
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "ConfigMap %s created", cm.Name)
-		} else {
-			// update configmap if it does not match spec
-			if component.NeedsUpdateConfigMap(cm, configMaps.Items[0]) {
-				log.Info("updating configmap")
-				if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
-					return ctrl.Result{}, err
-				}
-				if err := r.Update(ctx, &cm); err != nil {
-					r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update ConfigMap %s, err = ", cm.Name, err)
-					return ctrl.Result{}, err
-				}
-				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "ConfigMap %s updated", cm.Name)
-			}
+	if len(configMaps.Items) < 1 {
+		log.Info("creating configmap")
+		if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+			return ctrl.Result{}, err
 		}
+		if err := r.Create(ctx, &cm); err != nil {
+			r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create ConfigMap %s, err = ", cm.Name, err)
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "ConfigMap %s created", cm.Name)
 	} else {
-		for _, cm := range configMaps.Items {
-			if err := r.Delete(ctx, &cm); err != nil {
-				log.Error(err, "failed to delete cm")
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete ConfigMap %s, err = ", cm.Name, err)
-			} else {
-				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "ConfigMap %s deleted", cm.Name)
+		// update configmap if it does not match spec
+		if component.NeedsUpdateConfigMap(cm, configMaps.Items[0]) {
+			log.Info("updating configmap")
+			if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
+				return ctrl.Result{}, err
 			}
+			if err := r.Update(ctx, &cm); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update ConfigMap %s, err = ", cm.Name, err)
+				return ctrl.Result{}, err
+			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "ConfigMap %s updated", cm.Name)
 		}
 	}
 
@@ -126,27 +117,16 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := ctrl.SetControllerReference(mc, &pvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if !destroying {
-		if len(persistentVolumeClaims.Items) < 1 {
-			log.Info("creating pvc")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &pvc); err != nil {
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create PersistentVolumeClaim %s, err = ", pvc.Name, err)
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "PersistentVolumeClaim %s created", pvc.Name)
+	if len(persistentVolumeClaims.Items) < 1 {
+		log.Info("creating pvc")
+		if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+			return ctrl.Result{}, err
 		}
-	} else {
-		for _, pvc := range persistentVolumeClaims.Items {
-			if err := r.Delete(ctx, &pvc); err != nil {
-				log.Error(err, "failed to delete pvc")
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete PersistentVolumeClaim %s, err = ", pvc.Name, err)
-			} else {
-				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "PersistentVolumeClaim %s deleted", pvc.Name)
-			}
+		if err := r.Create(ctx, &pvc); err != nil {
+			r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create PersistentVolumeClaim %s, err = ", pvc.Name, err)
+			return ctrl.Result{}, err
 		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "PersistentVolumeClaim %s created", pvc.Name)
 	}
 
 	// generate deployment from spec
@@ -158,14 +138,12 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	if !destroying {
-		// get the latest configmap for the deployment annotations
-		if err := r.Get(ctx, types.NamespacedName{Namespace: cm.Namespace, Name: cm.Name}, &cm); err != nil {
-			log.Error(err, "failed to get latest configmap", "namespace", cm.Namespace, "owner", cm.Name)
-			return ctrl.Result{}, err
-		}
-		deploy.Annotations["configmap-revision"] = cm.ResourceVersion
+	// get the latest configmap for the deployment annotations
+	if err := r.Get(ctx, types.NamespacedName{Namespace: cm.Namespace, Name: cm.Name}, &cm); err != nil {
+		log.Error(err, "failed to get latest configmap", "namespace", cm.Namespace, "owner", cm.Name)
+		return ctrl.Result{}, err
 	}
+	deploy.Annotations["configmap-revision"] = cm.ResourceVersion
 
 	// list existing deployments
 	var deployments appsv1.DeploymentList
@@ -174,50 +152,40 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	if !destroying {
-		// create Deployment, if it does not exist
-		if len(deployments.Items) < 1 {
-			log.Info("creating deployment")
-			if err := r.setStatus(ctx, mc, v1alpha2.Creating); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &deploy); err != nil {
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Deployment %s, err = ", deploy.Name, err)
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Deployment %s created", deploy.Name)
-		} else {
-			// update deployment if it does not match spec
-			if component.NeedsUpdateDeployment(deploy, deployments.Items[0]) {
-				log.Info("updating deployment")
-				if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
-					return ctrl.Result{}, err
-				}
-				if *deploy.Spec.Replicas == 0 && *deployments.Items[0].Spec.Replicas != 0 {
-					if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
-						return ctrl.Result{}, err
-					}
-				}
-				if *deploy.Spec.Replicas != 0 && *deployments.Items[0].Spec.Replicas == 0 {
-					if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
-						return ctrl.Result{}, err
-					}
-				}
-				if err := r.Update(ctx, &deploy); err != nil {
-					r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update Deployment %s, err = ", deploy.Name, err)
-					return ctrl.Result{}, err
-				}
-				r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "Deployment %s updated", deploy.Name)
-			}
+	// create Deployment, if it does not exist
+	if len(deployments.Items) < 1 {
+		log.Info("creating deployment")
+		if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+			return ctrl.Result{}, err
 		}
+		if err := r.Create(ctx, &deploy); err != nil {
+			r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Deployment %s, err = ", deploy.Name, err)
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Deployment %s created", deploy.Name)
 	} else {
-		for _, deploy := range deployments.Items {
-			if err := r.Delete(ctx, &deploy); err != nil {
-				log.Error(err, "failed to delete deploy")
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Deployment %s, err = ", deploy.Name, err)
+		// update deployment if it does not match spec
+		if component.NeedsUpdateDeployment(deploy, deployments.Items[0]) {
+			log.Info("updating deployment")
+			if err := r.setStatus(ctx, mc, v1alpha2.Updating); err != nil {
+				return ctrl.Result{}, err
 			}
+			if *deploy.Spec.Replicas == 0 && *deployments.Items[0].Spec.Replicas != 0 {
+				if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+			if *deploy.Spec.Replicas != 0 && *deployments.Items[0].Spec.Replicas == 0 {
+				if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+			if err := r.Update(ctx, &deploy); err != nil {
+				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorUpdating", "Failed to update Deployment %s, err = ", deploy.Name, err)
+				return ctrl.Result{}, err
+			}
+			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Updated", "Deployment %s updated", deploy.Name)
 		}
-		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Deployment %s deleted", deploy.Name)
 	}
 
 	// generate service from spec
@@ -233,68 +201,57 @@ func (r *MinecraftReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	if !destroying {
-		// create Service, if it does not exist and Minecraft.Serve is true
-		if len(services.Items) == 0 && mc.Spec.Serve {
-			log.Info("creating service", "existing", len(services.Items))
+	// create Service, if it does not exist and Minecraft.Serve is true
+	if len(services.Items) == 0 && mc.Spec.Serve {
+		log.Info("creating service", "existing", len(services.Items))
 
-			// set status and create
+		// set status and create
+		if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, &service); err != nil {
+			r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Service %s, err = ", service.Name, err)
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Service %s created", service.Name)
+	}
+	// destroy service, if it does exist and Minecraft.Serve is false
+	if len(services.Items) > 0 && !mc.Spec.Serve {
+		log.Info("destroying service")
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleting", "Deleting service %s", service.Name)
+		if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Delete(ctx, &service); err != nil {
+			r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Service %s, err = ", service.Name, err)
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Service %s deleted", service.Name)
+	}
+	if len(services.Items) == 0 && !mc.Spec.Serve {
+		if err := r.setStatus(ctx, mc, v1alpha2.Stopped); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.setStatusAddress(ctx, mc, nil); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	if len(services.Items) >= 1 && mc.Spec.Serve {
+		// set the Address status once we have a LoadBalancer IP
+		if len(services.Items[0].Status.LoadBalancer.Ingress) > 0 && services.Items[0].Status.LoadBalancer.Ingress[0].IP != "" {
+			if err := r.setStatusAddress(ctx, mc, &services.Items[0]); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.setStatus(ctx, mc, v1alpha2.Running); err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
 			if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &service); err != nil {
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorCreating", "Failed to create Service %s, err = ", service.Name, err)
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Created", "Service %s created", service.Name)
-		}
-		// destroy service, if it does exist and Minecraft.Serve is false
-		if len(services.Items) > 0 && !mc.Spec.Serve {
-			log.Info("destroying service")
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleting", "Deleting service %s", service.Name)
-			if err := r.setStatus(ctx, mc, v1alpha2.Stopping); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Delete(ctx, &service); err != nil {
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Service %s, err = ", service.Name, err)
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Service %s deleted", service.Name)
-		}
-		if len(services.Items) == 0 && !mc.Spec.Serve {
-			if err := r.setStatus(ctx, mc, v1alpha2.Stopped); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err := r.setStatusAddress(ctx, mc, nil); err != nil {
 				return ctrl.Result{}, err
 			}
-		}
-		if len(services.Items) >= 1 && mc.Spec.Serve {
-			// set the Address status once we have a LoadBalancer IP
-			if len(services.Items[0].Status.LoadBalancer.Ingress) > 0 && services.Items[0].Status.LoadBalancer.Ingress[0].IP != "" {
-				if err := r.setStatusAddress(ctx, mc, &services.Items[0]); err != nil {
-					return ctrl.Result{}, err
-				}
-				if err := r.setStatus(ctx, mc, v1alpha2.Running); err != nil {
-					return ctrl.Result{}, err
-				}
-			} else {
-				if err := r.setStatus(ctx, mc, v1alpha2.Starting); err != nil {
-					return ctrl.Result{}, err
-				}
-				if err := r.setStatusAddress(ctx, mc, nil); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-		}
-	} else {
-		for _, svc := range services.Items {
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleting", "Deleting service %s", service.Name)
-			if err := r.Delete(ctx, &svc); err != nil {
-				log.Error(err, "failed to delete svc")
-				r.Recorder.Eventf(mc, corev1.EventTypeWarning, "ErrorDeleting", "Failed to delete Service %s, err = ", service.Name, err)
-			}
-			r.Recorder.Eventf(mc, corev1.EventTypeNormal, "Deleted", "Deleting service %s", service.Name)
 		}
 	}
 

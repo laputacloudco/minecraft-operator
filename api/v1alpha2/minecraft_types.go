@@ -9,31 +9,21 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package v1alpha2
 
 import (
+	"github.com/laputacloudco/minecraft-operator/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MinecraftSpec defines the desired state of Minecraft
-type MinecraftSpec struct {
-	// Config to be passed to the server container as environment variables.
-	Config map[string]string `json:"config,omitempty"`
-
-	// ServicePort the port the server service will be reachable on.
-	ServicePort int32 `json:"servicePort,omitempty"`
-
-	// ServiceType the type of Kubernetes Service to create.
-	ServiceType string `json:"serviceType,omitempty"`
-
+type StorageOptions struct {
 	// StorageClassName the storage class for creating the game data PVC.
 	StorageClassName string `json:"storageClassName,omitempty"`
 
 	// StorageSize the capacity of the game data PVC.
 	StorageSize string `json:"storageSize,omitempty"`
+}
 
+type DeploymentOptions struct {
 	// Image the server container to pull and run.
 	Image string `json:"image,omitempty"`
-
-	// Serve tells the controller to run or stop this Server.
-	Serve bool `json:"serve,omitempty"`
 
 	// CPU is the CPU resource limit of the created instance.
 	// +kubebuilder:validation:Required
@@ -60,15 +50,40 @@ type MinecraftSpec struct {
 	RequestMemory string `json:"requestMemory,omitempty"`
 }
 
+type ServiceOptions struct {
+	// ServicePort the port the server service will be reachable on.
+	ServicePort int32 `json:"servicePort,omitempty"`
+
+	// ServiceType the type of Kubernetes Service to create.
+	ServiceType string `json:"serviceType,omitempty"`
+}
+
+// MinecraftSpec defines the desired state of Minecraft
+type MinecraftSpec struct {
+	// DeploymentOptions the Kubernetes Deployment options
+	DeploymentOptions *DeploymentOptions `json:"deploymentOptions,omitempty"`
+
+	// GameOptions the gameplay configuration options.
+	GameOptions *types.GameOptions `json:"gameOptions,omitempty"`
+
+	// ServerOptions the server runtime configuration options.
+	ServerOptions *types.ServerOptions `json:"serverOptions,omitempty"`
+
+	// ServiceOptions the Kubernetes service options.
+	ServiceOptions *ServiceOptions `json:"serviceOptions,omitempty"`
+
+	// StorageOptions the Kubernetes storage options.
+	StorageOptions *StorageOptions `json:"storageOptions,omitempty"`
+
+	// Serve tells the operator to make the server available or not.
+	Serve bool `json:"serve,omitempty"`
+}
+
 // ServerStatus indicates the Server Status
 //+kubebuilder:validation:Enum=Creating;Destroying;Running;Starting;Stopped;Stopping;Unknown;Updating
 type ServerStatus string
 
 const (
-	// Creating status
-	Creating ServerStatus = "Creating"
-	// Destroying status
-	Destroying ServerStatus = "Destroying"
 	// Running status
 	Running ServerStatus = "Running"
 	// Starting status
@@ -89,12 +104,15 @@ type MinecraftStatus struct {
 	Status ServerStatus `json:"status,omitempty"`
 	// Address the public server address
 	Address string `json:"address,omitempty"`
+	// PlayerCount the number of players connected
+	PlayerCount string `json:"playerCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.status`
 //+kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.status.address`
+//+kubebuilder:printcolumn:name="Players",type=string,JSONPath=`.status.playerCount`
 
 // Minecraft is the Schema for the minecrafts API
 type Minecraft struct {
