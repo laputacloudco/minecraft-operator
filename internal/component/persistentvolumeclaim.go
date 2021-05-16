@@ -18,7 +18,7 @@ import (
 
 // GeneratePVC creates a PVC for the Minecraft server
 func GeneratePVC(mc v1alpha2.Minecraft) (v1.PersistentVolumeClaim, error) {
-	pvcSizeRequest, err := resource.ParseQuantity(mc.Spec.StorageSize)
+	pvcSizeRequest, err := resource.ParseQuantity(mc.Spec.StorageOptions.StorageSize)
 	if err != nil {
 		return v1.PersistentVolumeClaim{}, err
 	}
@@ -31,7 +31,7 @@ func GeneratePVC(mc v1alpha2.Minecraft) (v1.PersistentVolumeClaim, error) {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &mc.Spec.StorageClassName,
+			StorageClassName: &mc.Spec.StorageOptions.StorageClassName,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: pvcSizeRequest,

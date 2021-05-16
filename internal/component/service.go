@@ -38,7 +38,7 @@ func GenerateService(mc v1alpha2.Minecraft) v1.Service {
 				},
 			},
 			Selector: standardLabels(mc),
-			Type:     v1.ServiceType(mc.Spec.ServiceType),
+			Type:     v1.ServiceType(mc.Spec.ServiceOptions.ServiceType),
 		},
 	}
 }
